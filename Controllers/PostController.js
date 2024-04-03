@@ -31,58 +31,52 @@ export const CreatNewPost = async (req, res) => {
 }
 
 
-export const GetPost = async (req, res) => {
-  try {
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 5;
-    const category = req.query.category === "0" ? "" : req.query.category;
-    const postTitle = req.query.post_title || "";
-    // const location = req.query.location || "";
-    const locations = req.query.location ? req.query.location.split(',') : [];
-    const startIndex = (page - 1) * limit;
-    const endIndex = page * limit;
+//this optimise get api advence
+ export const GetPost = async (req, res) => {
+      try {
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 10;
+        const skip = (page - 1) * limit;
+        const category = (req.query.category === "0" || req.query.category === "15") ? "" : req.query.category;
 
-    const query = {}; 
+        const postTitle = req.query.post_title || "";
+        const locations = req.query.location ? req.query.location.split(',') : [];
+        const Productname = req.query.Productname || ""; // Extract Productname from query parameters
+        const _id=req.query._id
+        const query = {};
 
-    // Adding conditions based on parameters
-    if (category !== "") {
-      query.category = category;
-    }
-    if (postTitle !== "") {
-      query.post_title = { $regex: postTitle, $options: 'i' };
-    }
-    if (locations.length > 0) {
-      query.location = { $in: locations };
-    }
-    // if (location !== "") {
-    //   query.location = location; 
-    // }
+        if (category !== "") {
+          query.category = category;
+        }
+        if(_id!==""){
+          query._id = _id;
+        }
+        if (postTitle !== "") {
+          query.post_title = { $regex: postTitle, $options: 'i' };
+        }
+        if (locations.length > 0) {
+          query.location = { $in: locations };
+        }
+        if (Productname !== "") {
+          query.Productname = { $regex: Productname, $options: 'i' };
+        }
 
-    const totalPosts = await Post.countDocuments(query);
-    const hasMore = endIndex < totalPosts;
-
-    const pagination = {
-      currentPage: page,
-      totalPages: Math.ceil(totalPosts / limit),
+        const totalPosts = await Post.countDocuments(); // Total count of documents
+        const posts = await Post.aggregate([
+          // { $match: {} }, // Your match conditions here
+          { $match: query },
+          {$sort:{_id:-1}},
+          { $project: { post_title: 1, Contactnumber: 1, Link: 1, combineimg: 1 ,location:1} },
+          { $skip: skip },
+          { $limit: limit }
+        ]).allowDiskUse(true).exec();
+    
+        res.send({ totalPosts, currentPage: page, totalPages: Math.ceil(totalPosts / limit) ,posts});
+      } catch (error) {
+        console.error('Error retrieving posts:', error);
+        res.status(500).send('An error occurred');
+      }
     };
-
-    const images = await Post.find(query, { post_title: 1, Contactnumber: 1 })
-      .sort({ createdAt: -1 })
-      .skip(startIndex)
-      .limit(limit);
-
-    res.send({
-      totalPosts,
-      pagination,
-      posts: images,
-      hasMore,
-    });
-  } catch (error) {
-    console.error('Error retrieving images:', error);
-    res.status(500).send('An error occurred');
-  }
-};
-
 
 
 
